@@ -7,7 +7,7 @@
     html, body {
       margin: 0;
       padding: 0;
-      background: black;
+      background: white;
       width: 100%;
       height: 100%;
       display: flex;
@@ -109,23 +109,12 @@
   <link rel="stylesheet" href="https://use.typekit.net/mgy3ngg.css">
 </head>
 <body>
-  <div id="gui">
-    <div>
-      <label><input type="checkbox" id="toggleCoords" checked> Show Nexus Coordinates</label>
-    </div>
-    <div>
-      <button id="toggleMode">Switch Mode</button>
-    </div>
-  </div>
   <div id="combinedContainer">
     <div id="wrapper">
       <canvas id="canvas"></canvas>
       <div id="coordLabel"></div>
     </div>
     <div class="fade-overlay" id="fadeOverlay"></div>
-    <div id="dotWrapper">
-      <video id="dotVideo" autoplay muted loop playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
-    </div>
   </div>
   <script>
     const offices = [
@@ -138,9 +127,7 @@
       { name: "Kansas City", xRatio: 0.2, yRatio: 0.42, timezoneOffset: -6, weather: "Clear, 27°C" },
       { name: "Mount Laurel", xRatio: 0.25, yRatio: 0.38, timezoneOffset: -5, weather: "Sunny, 25°C" },
       { name: "Newark", xRatio: 0.26, yRatio: 0.36, timezoneOffset: -5, weather: "Cloudy, 24°C" },
-      { name: "Edgewood (I)", xRatio: 0.27, yRatio: 0.36, timezoneOffset: -5, weather: "Rainy, 21°C" },
-      { name: "Edgewood (II)", xRatio: 0.27, yRatio: 0.37, timezoneOffset: -5, weather: "Rainy, 21°C" },
-      { name: "Edgewood (III)", xRatio: 0.27, yRatio: 0.38, timezoneOffset: -5, weather: "Rainy, 21°C" },
+      { name: "Edgewood", xRatio: 0.27, yRatio: 0.36, timezoneOffset: -5, weather: "Rainy, 21°C" },
       { name: "Lake Success", xRatio: 0.27, yRatio: 0.35, timezoneOffset: -5, weather: "Clear, 24°C" },
       { name: "New York", xRatio: 0.28, yRatio: 0.34, timezoneOffset: -5, weather: "Sunny, 25°C" },
       { name: "Pittsburgh", xRatio: 0.26, yRatio: 0.34, timezoneOffset: -5, weather: "Cloudy, 23°C" },
@@ -170,19 +157,21 @@
       { name: "Manila", xRatio: 0.8, yRatio: 0.72, timezoneOffset: 8, weather: "Stormy, 29°C" }
     ];
 
+    // Use a hardcoded slice range of 3 to 8, random on each transition
     let numShapes = 5;
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
     const coordLabel = document.getElementById("coordLabel");
-    const toggleCoords = document.getElementById("toggleCoords");
 let w, h;
 let mouse = { x: 0, y: 0 };
 let target = { x: 0, y: 0 };
 let targetOffice;
-const travelSpeed = 0.1; // Slower travel speed for a more premium feel
+const travelSpeed = 0.5;
 let isHovering = false;
+let isTraveling = false;
 let hoverStartTime = 0;
-const hoverDuration = 5000; // 5 seconds in milliseconds
+const hoverDuration = 1000; // Quick transitions
+let rotationOffset = 0;
 
     let transitionProgress = 1;
     let transitioning = false;
@@ -193,14 +182,24 @@ const hoverDuration = 5000; // 5 seconds in milliseconds
       targetOffice = offices[Math.floor(Math.random() * offices.length)];
       target.x = targetOffice.xRatio * w;
       target.y = targetOffice.yRatio * h;
-
-      // Change the number of shapes for the new animation
-      numShapes = Math.floor(Math.random() * 8) + 3; // Randomly between 3 and 10
-      resize(true); // Pass true to indicate a seamless update
+      // Hardcoded slice range: 3 to 6
+      let newNumShapes;
+      do {
+        newNumShapes = Math.floor(Math.random() * 4) + 3; // 3 to 6 inclusive
+      } while (newNumShapes === numShapes);
+      numShapes = newNumShapes;
+      rotationOffset = Math.random() * 0.5; // Reduced from full 2π to subtle range
+      isTraveling = true;
+      transitioning = true;
+      transitionProgress = 0;
+      resize(true);
     }
 
     function updateMousePosition() {
       if (isHovering) {
+        // Smoothly approach the target when hovering to avoid sudden jumps
+        mouse.x += (target.x - mouse.x) * 0.2;
+        mouse.y += (target.y - mouse.y) * 0.2;
         if (Date.now() - hoverStartTime > hoverDuration) {
           isHovering = false;
           setNextOfficeTarget();
@@ -208,19 +207,21 @@ const hoverDuration = 5000; // 5 seconds in milliseconds
         return; // Don't move the mouse while hovering
       }
 
-      let dx = target.x - mouse.x;
-      let dy = target.y - mouse.y;
-      let dist = Math.sqrt(dx * dx + dy * dy);
+      // Allow traveling and animation during transitions
+      if (isTraveling) {
+        let dx = target.x - mouse.x;
+        let dy = target.y - mouse.y;
+        let dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (dist < 5) { // Use a larger threshold to trigger hover
-        isHovering = true;
-        hoverStartTime = Date.now();
-        // Snap to the final position to prevent drifting
-        mouse.x = target.x;
-        mouse.y = target.y;
-      } else {
-        mouse.x += dx * travelSpeed * 0.01;
-        mouse.y += dy * travelSpeed * 0.01;
+        if (dist < 0.5) {
+          isHovering = true;
+          isTraveling = false;
+          hoverStartTime = Date.now();
+          // Let easing continue without force-snapping
+        } else {
+          mouse.x += dx * travelSpeed * 0.005;
+          mouse.y += dy * travelSpeed * 0.005;
+        }
       }
     }
 
@@ -233,17 +234,16 @@ const hoverDuration = 5000; // 5 seconds in milliseconds
         mouse.x = w / 2;
         mouse.y = h / 2;
       }
-
       const center = [w / 2, h / 2];
       const radius = Math.sqrt(w * w + h * h);
-
       targetEdges = [];
-
+      // Guarantee each slice touches at least one other slice edge (no gaps)
+      const angularWidth = (Math.PI * 2) / numShapes;
       for (let i = 0; i < numShapes; i++) {
-        const targetAngle1 = (i / numShapes) * 2 * Math.PI;
-        const targetAngle2 = ((i + 1) / numShapes) * 2 * Math.PI;
-
-        const midAngle = (targetAngle1 + targetAngle2) / 2;
+        const targetAngle1 = rotationOffset + i * angularWidth;
+        const targetAngle2 = rotationOffset + (i + 1) * angularWidth;
+        // Simpler, non-animated gradient logic
+        const midAngle = (i + 0.5) * angularWidth + rotationOffset;
         const midX = center[0] + radius * Math.cos(midAngle);
         const midY = center[1] + radius * Math.sin(midAngle);
         const gradLength = w;
@@ -251,7 +251,6 @@ const hoverDuration = 5000; // 5 seconds in milliseconds
         const gy0 = midY - gradLength;
         const gx1 = midX + gradLength;
         const gy1 = midY + gradLength;
-
         const match = edges[i];
         let gradient;
         if (match) {
@@ -261,27 +260,27 @@ const hoverDuration = 5000; // 5 seconds in milliseconds
           gradient.addColorStop(0, '#0F3DB5');
           gradient.addColorStop(1, '#2662fc');
         }
-
         targetEdges.push({
           angle1: match ? match.angle1 : targetAngle1,
           angle2: match ? match.angle2 : targetAngle2,
           targetAngle1,
           targetAngle2,
           gradient,
-          remove: false
+          remove: false,
+          prev: i - 1,
+          next: i + 1
         });
+        targetEdges[i].index = i;
       }
-
       for (let i = numShapes; i < edges.length; i++) {
         const leftover = edges[i];
         targetEdges.push({
           ...leftover,
-          targetAngle1: leftover.angle1 + 0.2,
-          targetAngle2: leftover.angle2 + 0.2,
+          targetAngle1: leftover.angle1,
+          targetAngle2: leftover.angle1,
           remove: true
         });
       }
-
       transitioning = true;
       transitionProgress = 0;
     }
@@ -303,24 +302,44 @@ const hoverDuration = 5000; // 5 seconds in milliseconds
       }
 
       if (transitioning) {
-        transitionProgress = Math.min(1, transitionProgress + 0.005);
-        if (transitionProgress === 1) transitioning = false;
+        let dx = target.x - mouse.x;
+        let dy = target.y - mouse.y;
+        let dist = Math.sqrt(dx * dx + dy * dy);
+        let speedFactor = Math.min(1, 0.0005 + (dist / 3000000)); // Slower overall progress, synced with travel
+        transitionProgress = Math.min(1, transitionProgress + speedFactor);
+        // Keep transitioning true during travel; only end when office is reached and label fades in
+        // If not traveling, not hovering, and transition is done, stop transitioning
+        if (!isTraveling && !isHovering && transitionProgress === 1) transitioning = false;
       }
 
       updateMousePosition();
-      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, w, h);
 
       const center = [w / 2, h / 2];
       const radius = Math.sqrt(w * w + h * h);
 
       for (let i = edges.length - 1; i >= 0; i--) {
         const shape = edges[i];
+        // Angle interpolation with unified easing and speed
+        const t = (0.5 - Math.cos(Math.PI * transitionProgress) / 2);
 
-        const t = 0.005 + 0.01 * transitionProgress;
-        shape.angle1 = angleLerp(shape.angle1, shape.targetAngle1, t);
-        shape.angle2 = angleLerp(shape.angle2, shape.targetAngle2, t);
+        // Entering and exiting slices: differentiate animation direction
+        const isEntering = !shape.remove;
+        const isExiting = shape.remove;
 
-        if (shape.remove) {
+        if (isEntering) {
+          // Animate normally
+          shape.angle1 = angleLerp(shape.angle1, shape.targetAngle1, t * 0.1);
+          shape.angle2 = angleLerp(shape.angle2, shape.targetAngle2, t * 0.1);
+        } else if (isExiting) {
+          // Reverse direction of animation
+          shape.angle1 = angleLerp(shape.angle1, shape.targetAngle2, t * 0.1);
+          shape.angle2 = angleLerp(shape.angle2, shape.targetAngle1, t * 0.1);
+        }
+
+        // Remove collapsed slices
+        if (shape.remove && transitionProgress >= 0.99) {
           const diff1 = Math.abs(shape.angle1 - shape.targetAngle1);
           const diff2 = Math.abs(shape.angle2 - shape.targetAngle2);
           if (diff1 < 0.001 && diff2 < 0.001) {
@@ -328,14 +347,24 @@ const hoverDuration = 5000; // 5 seconds in milliseconds
             continue;
           }
         }
-
+        // Simpler, non-animated gradient
+        const midAngle = (shape.angle1 + shape.angle2) / 2;
+        const midX = center[0] + radius * Math.cos(midAngle);
+        const midY = center[1] + radius * Math.sin(midAngle);
+        const gradLength = w;
+        const gx0 = midX - gradLength;
+        const gy0 = midY - gradLength;
+        const gx1 = midX + gradLength;
+        const gy1 = midY + gradLength;
+        shape.gradient = ctx.createLinearGradient(gx0, gy0, gx1, gy1);
+        shape.gradient.addColorStop(0, '#0F3DB5');
+        shape.gradient.addColorStop(1, '#2662fc');
         const x1 = center[0] + radius * Math.cos(shape.angle1);
         const y1 = center[1] + radius * Math.sin(shape.angle1);
         const x2 = center[0] + radius * Math.cos(shape.angle2);
         const y2 = center[1] + radius * Math.sin(shape.angle2);
-
         ctx.fillStyle = shape.gradient;
-
+        ctx.globalCompositeOperation = "source-over";
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
@@ -350,72 +379,33 @@ const hoverDuration = 5000; // 5 seconds in milliseconds
       coordLabel.style.left = `${mouse.x * (canvasRect.width / w)}px`;
       coordLabel.style.top = `${mouse.y * (canvasRect.height / h)}px`;
 
-      if (transitioning) {
-        coordLabel.style.opacity = "0";
-      } else {
-        let showLabel = false;
-        if (targetOffice) {
-          const ox = targetOffice.xRatio * w;
-          const oy = targetOffice.yRatio * h;
-          const odist = Math.sqrt((ox - mouse.x) ** 2 + (oy - mouse.y) ** 2);
-          if (odist < 40) { // Show label when approaching
-            const now = new Date();
-            const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-            const localTime = new Date(utc + 3600000 * targetOffice.timezoneOffset)
-              .toTimeString()
-              .split(" ")[0];
-            coordLabel.innerHTML = `
-              <div style="font-size: 14px; font-weight: 700;">${targetOffice.name}</div>
-              <div style="font-size: 12px; font-weight: 400;">${targetOffice.weather}</div>
-              <div style="font-size: 10px; font-weight: 300;">${localTime}</div>
-            `;
-            showLabel = true;
-          }
+      // Always show label based on distance to target, not transitioning state
+      let showLabel = false;
+      if (targetOffice) {
+        const ox = targetOffice.xRatio * w;
+        const oy = targetOffice.yRatio * h;
+        const odist = Math.sqrt((ox - mouse.x) ** 2 + (oy - mouse.y) ** 2);
+        if (odist < 80) {
+          const now = new Date();
+          const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+          const localTime = new Date(utc + 3600000 * targetOffice.timezoneOffset)
+            .toTimeString()
+            .split(" ")[0];
+          coordLabel.innerHTML = `
+            <div style="font-size: 14px; font-weight: 700;">${targetOffice.name}</div>
+            <div style="font-size: 12px; font-weight: 400;">${targetOffice.weather}</div>
+            <div style="font-size: 10px; font-weight: 300;">${localTime}</div>
+          `;
+          showLabel = true;
         }
-        coordLabel.style.opacity = toggleCoords.checked && showLabel ? "1" : "0";
       }
+      coordLabel.style.opacity = showLabel ? "1" : "0";
     }
 
     resize();
     setNextOfficeTarget(); // Set initial target
     draw();
 
-    // --- Dot video preparation ---
-    const dotVideo = document.getElementById("dotVideo");
-    dotVideo.src = "https://attachments.are.na/38428354/da56eae840d7fcabc39143864cfcccf2.mov"; // placeholder for video URL once uploaded
-    // --- Switch mode code ---
-    const dotWrapper = document.getElementById("dotWrapper");
-    const wrapper = document.getElementById("wrapper");
-    const fadeOverlay = document.getElementById("fadeOverlay");
-    const toggleModeButton = document.getElementById("toggleMode");
-
-    let inClockMode = true;
-
-toggleModeButton.addEventListener("click", () => {
-  fadeOverlay.style.opacity = "1";
-  fadeOverlay.style.zIndex = "6"; // bring to front
-
-  const duration = 3000;
-  const holdTime = 500;
-
-  setTimeout(() => {
-    inClockMode = !inClockMode;
-    wrapper.style.display = inClockMode ? "block" : "none";
-    dotWrapper.style.display = inClockMode ? "none" : "block";
-
-    setTimeout(() => {
-      fadeOverlay.style.opacity = "0";
-      // Wait for fade-out to complete before lowering zIndex
-      setTimeout(() => {
-        fadeOverlay.style.zIndex = "5";
-      }, duration);
-    }, holdTime);
-  }, duration);
-});
-
-    // Initially only show wrapper
-    wrapper.style.display = "block";
-    dotWrapper.style.display = "none";
   </script>
 </body>
 </html>

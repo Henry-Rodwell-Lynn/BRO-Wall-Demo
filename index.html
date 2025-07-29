@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Nexus Point Fan Shapes</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: black;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+    }
+    body {
+      font-family: "freight-sans-pro", sans-serif;
+      font-weight: 400;
+      font-style: normal;
+    }
+    #mainContainer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    #wrapper {
+      width: 80vw;
+      aspect-ratio: 8 / 3;
+      position: relative;
+      overflow: hidden;
+    }
+    .fade-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #0F3DB5;
+      opacity: 0;
+      overflow: hidden;
+      transition: opacity 3s ease-in-out;
+      pointer-events: none;
+      z-index: 5;
+    }
+    #dotWrapper, #wrapper {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    #combinedContainer {
+      position: relative;
+      width: 80vw;
+      aspect-ratio: 8 / 3;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    #coordLabel {
+      position: absolute;
+      color: white;
+      font-family: "freight-sans-pro", sans-serif;
+      font-weight: 400;
+      font-style: normal;
+      font-size: 12px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 1s ease-in-out;
+      transform: none;
+    }
+    #gui {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      font-family: sans-serif;
+      background: white;
+      padding: 10px;
+      border-radius: 6px;
+      color: black;
+    }
+    #wrapper + #wrapper {
+      margin-top: 5px;
+    }
+    #dotWrapper {
+      width: 80vw;
+      aspect-ratio: 8 / 3;
+      position: relative;
+      overflow: hidden;
+      margin-top: 5px;
+      background: #0F3DB5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    #dotCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+  </style>
+  <link rel="stylesheet" href="https://use.typekit.net/mgy3ngg.css">
+</head>
+<body>
+  <div id="gui">
+    <div>
+      <label><input type="checkbox" id="toggleCoords" checked> Show Nexus Coordinates</label>
+    </div>
+    <div>
+      <button id="toggleMode">Switch Mode</button>
+    </div>
+  </div>
+  <div id="combinedContainer">
+    <div id="wrapper">
+      <canvas id="canvas"></canvas>
+      <div id="coordLabel"></div>
+    </div>
+    <div class="fade-overlay" id="fadeOverlay"></div>
+    <div id="dotWrapper">
+      <video id="dotVideo" autoplay muted loop playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+    </div>
+  </div>
+  <script>
+    const offices = [
+      { name: "Phoenix", xRatio: 0.15, yRatio: 0.55, timezoneOffset: -7, weather: "Hot, 37°C" },
+      { name: "El Dorado Hills", xRatio: 0.1, yRatio: 0.5, timezoneOffset: -7, weather: "Clear, 30°C" },
+      { name: "Denver", xRatio: 0.18, yRatio: 0.45, timezoneOffset: -6, weather: "Sunny, 28°C" },
+      { name: "South Windsor", xRatio: 0.22, yRatio: 0.35, timezoneOffset: -5, weather: "Cloudy, 22°C" },
+      { name: "Andover", xRatio: 0.23, yRatio: 0.33, timezoneOffset: -5, weather: "Partly Cloudy, 20°C" },
+      { name: "Boston", xRatio: 0.24, yRatio: 0.32, timezoneOffset: -5, weather: "Rainy, 18°C" },
+      { name: "Kansas City", xRatio: 0.2, yRatio: 0.42, timezoneOffset: -6, weather: "Clear, 27°C" },
+      { name: "Mount Laurel", xRatio: 0.25, yRatio: 0.38, timezoneOffset: -5, weather: "Sunny, 25°C" },
+      { name: "Newark", xRatio: 0.26, yRatio: 0.36, timezoneOffset: -5, weather: "Cloudy, 24°C" },
+      { name: "Edgewood (I)", xRatio: 0.27, yRatio: 0.36, timezoneOffset: -5, weather: "Rainy, 21°C" },
+      { name: "Edgewood (II)", xRatio: 0.27, yRatio: 0.37, timezoneOffset: -5, weather: "Rainy, 21°C" },
+      { name: "Edgewood (III)", xRatio: 0.27, yRatio: 0.38, timezoneOffset: -5, weather: "Rainy, 21°C" },
+      { name: "Lake Success", xRatio: 0.27, yRatio: 0.35, timezoneOffset: -5, weather: "Clear, 24°C" },
+      { name: "New York", xRatio: 0.28, yRatio: 0.34, timezoneOffset: -5, weather: "Sunny, 25°C" },
+      { name: "Pittsburgh", xRatio: 0.26, yRatio: 0.34, timezoneOffset: -5, weather: "Cloudy, 23°C" },
+      { name: "Coppell", xRatio: 0.21, yRatio: 0.55, timezoneOffset: -6, weather: "Hot, 35°C" },
+      { name: "Houston", xRatio: 0.22, yRatio: 0.58, timezoneOffset: -6, weather: "Humid, 33°C" },
+      { name: "Markham", xRatio: 0.26, yRatio: 0.28, timezoneOffset: -5, weather: "Cool, 18°C" },
+      { name: "Toronto", xRatio: 0.27, yRatio: 0.27, timezoneOffset: -5, weather: "Mild, 20°C" },
+      { name: "Bristol", xRatio: 0.38, yRatio: 0.29, timezoneOffset: 0, weather: "Rainy, 17°C" },
+      { name: "Edinburgh", xRatio: 0.39, yRatio: 0.26, timezoneOffset: 0, weather: "Cloudy, 16°C" },
+      { name: "London", xRatio: 0.4, yRatio: 0.3, timezoneOffset: 0, weather: "Cloudy, 18°C" },
+      { name: "Prague", xRatio: 0.46, yRatio: 0.29, timezoneOffset: 1, weather: "Clear, 22°C" },
+      { name: "Berlin", xRatio: 0.47, yRatio: 0.28, timezoneOffset: 1, weather: "Sunny, 24°C" },
+      { name: "Frankfurt", xRatio: 0.46, yRatio: 0.3, timezoneOffset: 1, weather: "Clear, 23°C" },
+      { name: "Dublin", xRatio: 0.37, yRatio: 0.28, timezoneOffset: 0, weather: "Rainy, 15°C" },
+      { name: "Gdansk", xRatio: 0.49, yRatio: 0.26, timezoneOffset: 1, weather: "Cloudy, 19°C" },
+      { name: "Paris", xRatio: 0.43, yRatio: 0.32, timezoneOffset: 1, weather: "Sunny, 25°C" },
+      { name: "Cluj", xRatio: 0.52, yRatio: 0.31, timezoneOffset: 2, weather: "Clear, 26°C" },
+      { name: "Milan", xRatio: 0.45, yRatio: 0.36, timezoneOffset: 1, weather: "Hot, 30°C" },
+      { name: "Stockholm", xRatio: 0.5, yRatio: 0.22, timezoneOffset: 1, weather: "Cool, 17°C" },
+      { name: "Sydney", xRatio: 0.85, yRatio: 0.85, timezoneOffset: 10, weather: "Clear, 18°C" },
+      { name: "Hong Kong", xRatio: 0.78, yRatio: 0.65, timezoneOffset: 8, weather: "Humid, 31°C" },
+      { name: "Bangalore", xRatio: 0.72, yRatio: 0.7, timezoneOffset: 5.5, weather: "Cloudy, 28°C" },
+      { name: "Hyderabad", xRatio: 0.71, yRatio: 0.7, timezoneOffset: 5.5, weather: "Sunny, 32°C" },
+      { name: "Mumbai", xRatio: 0.69, yRatio: 0.66, timezoneOffset: 5.5, weather: "Rainy, 29°C" },
+      { name: "Tokyo", xRatio: 0.82, yRatio: 0.58, timezoneOffset: 9, weather: "Clear, 27°C" },
+      { name: "Singapore", xRatio: 0.77, yRatio: 0.75, timezoneOffset: 8, weather: "Humid, 30°C" },
+      { name: "Manila", xRatio: 0.8, yRatio: 0.72, timezoneOffset: 8, weather: "Stormy, 29°C" }
+    ];
+
+    let numShapes = 5;
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const coordLabel = document.getElementById("coordLabel");
+    const toggleCoords = document.getElementById("toggleCoords");
+let w, h;
+let mouse = { x: 0, y: 0 };
+let target = { x: 0, y: 0 };
+let targetOffice;
+const travelSpeed = 0.1; // Slower travel speed for a more premium feel
+let isHovering = false;
+let hoverStartTime = 0;
+const hoverDuration = 5000; // 5 seconds in milliseconds
+
+    let transitionProgress = 1;
+    let transitioning = false;
+
+    let targetEdges = [];
+
+    function setNextOfficeTarget() {
+      targetOffice = offices[Math.floor(Math.random() * offices.length)];
+      target.x = targetOffice.xRatio * w;
+      target.y = targetOffice.yRatio * h;
+
+      // Change the number of shapes for the new animation
+      numShapes = Math.floor(Math.random() * 8) + 3; // Randomly between 3 and 10
+      resize(true); // Pass true to indicate a seamless update
+    }
+
+    function updateMousePosition() {
+      if (isHovering) {
+        if (Date.now() - hoverStartTime > hoverDuration) {
+          isHovering = false;
+          setNextOfficeTarget();
+        }
+        return; // Don't move the mouse while hovering
+      }
+
+      let dx = target.x - mouse.x;
+      let dy = target.y - mouse.y;
+      let dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < 5) { // Use a larger threshold to trigger hover
+        isHovering = true;
+        hoverStartTime = Date.now();
+        // Snap to the final position to prevent drifting
+        mouse.x = target.x;
+        mouse.y = target.y;
+      } else {
+        mouse.x += dx * travelSpeed * 0.01;
+        mouse.y += dy * travelSpeed * 0.01;
+      }
+    }
+
+    const edges = [];
+
+    function resize(isUpdate = false) {
+      if (!isUpdate) {
+        w = canvas.width = canvas.clientWidth;
+        h = canvas.height = canvas.clientHeight;
+        mouse.x = w / 2;
+        mouse.y = h / 2;
+      }
+
+      const center = [w / 2, h / 2];
+      const radius = Math.sqrt(w * w + h * h);
+
+      targetEdges = [];
+
+      for (let i = 0; i < numShapes; i++) {
+        const targetAngle1 = (i / numShapes) * 2 * Math.PI;
+        const targetAngle2 = ((i + 1) / numShapes) * 2 * Math.PI;
+
+        const midAngle = (targetAngle1 + targetAngle2) / 2;
+        const midX = center[0] + radius * Math.cos(midAngle);
+        const midY = center[1] + radius * Math.sin(midAngle);
+        const gradLength = w;
+        const gx0 = midX - gradLength;
+        const gy0 = midY - gradLength;
+        const gx1 = midX + gradLength;
+        const gy1 = midY + gradLength;
+
+        const match = edges[i];
+        let gradient;
+        if (match) {
+          gradient = match.gradient;
+        } else {
+          gradient = ctx.createLinearGradient(gx0, gy0, gx1, gy1);
+          gradient.addColorStop(0, '#0F3DB5');
+          gradient.addColorStop(1, '#2662fc');
+        }
+
+        targetEdges.push({
+          angle1: match ? match.angle1 : targetAngle1,
+          angle2: match ? match.angle2 : targetAngle2,
+          targetAngle1,
+          targetAngle2,
+          gradient,
+          remove: false
+        });
+      }
+
+      for (let i = numShapes; i < edges.length; i++) {
+        const leftover = edges[i];
+        targetEdges.push({
+          ...leftover,
+          targetAngle1: leftover.angle1 + 0.2,
+          targetAngle2: leftover.angle2 + 0.2,
+          remove: true
+        });
+      }
+
+      transitioning = true;
+      transitionProgress = 0;
+    }
+
+    window.addEventListener("resize", () => resize(false));
+
+    function draw() {
+      function angleLerp(current, target, t) {
+        let diff = target - current;
+        if (diff > Math.PI) diff -= 2 * Math.PI;
+        if (diff < -Math.PI) diff += 2 * Math.PI;
+        return current + diff * t;
+      }
+
+      if (transitionProgress === 0 && targetEdges.length) {
+        edges.length = 0;
+        edges.push(...targetEdges);
+        targetEdges = [];
+      }
+
+      if (transitioning) {
+        transitionProgress = Math.min(1, transitionProgress + 0.005);
+        if (transitionProgress === 1) transitioning = false;
+      }
+
+      updateMousePosition();
+      ctx.clearRect(0, 0, w, h);
+
+      const center = [w / 2, h / 2];
+      const radius = Math.sqrt(w * w + h * h);
+
+      for (let i = edges.length - 1; i >= 0; i--) {
+        const shape = edges[i];
+
+        const t = 0.005 + 0.01 * transitionProgress;
+        shape.angle1 = angleLerp(shape.angle1, shape.targetAngle1, t);
+        shape.angle2 = angleLerp(shape.angle2, shape.targetAngle2, t);
+
+        if (shape.remove) {
+          const diff1 = Math.abs(shape.angle1 - shape.targetAngle1);
+          const diff2 = Math.abs(shape.angle2 - shape.targetAngle2);
+          if (diff1 < 0.001 && diff2 < 0.001) {
+            edges.splice(i, 1);
+            continue;
+          }
+        }
+
+        const x1 = center[0] + radius * Math.cos(shape.angle1);
+        const y1 = center[1] + radius * Math.sin(shape.angle1);
+        const x2 = center[0] + radius * Math.cos(shape.angle2);
+        const y2 = center[1] + radius * Math.sin(shape.angle2);
+
+        ctx.fillStyle = shape.gradient;
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.lineTo(mouse.x, mouse.y);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      requestAnimationFrame(draw);
+      // Always update position and text, fade in/out with opacity
+      const canvasRect = canvas.getBoundingClientRect();
+      coordLabel.style.left = `${mouse.x * (canvasRect.width / w)}px`;
+      coordLabel.style.top = `${mouse.y * (canvasRect.height / h)}px`;
+
+      if (transitioning) {
+        coordLabel.style.opacity = "0";
+      } else {
+        let showLabel = false;
+        if (targetOffice) {
+          const ox = targetOffice.xRatio * w;
+          const oy = targetOffice.yRatio * h;
+          const odist = Math.sqrt((ox - mouse.x) ** 2 + (oy - mouse.y) ** 2);
+          if (odist < 40) { // Show label when approaching
+            const now = new Date();
+            const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+            const localTime = new Date(utc + 3600000 * targetOffice.timezoneOffset)
+              .toTimeString()
+              .split(" ")[0];
+            coordLabel.innerHTML = `
+              <div style="font-size: 14px; font-weight: 700;">${targetOffice.name}</div>
+              <div style="font-size: 12px; font-weight: 400;">${targetOffice.weather}</div>
+              <div style="font-size: 10px; font-weight: 300;">${localTime}</div>
+            `;
+            showLabel = true;
+          }
+        }
+        coordLabel.style.opacity = toggleCoords.checked && showLabel ? "1" : "0";
+      }
+    }
+
+    resize();
+    setNextOfficeTarget(); // Set initial target
+    draw();
+
+    // --- Dot video preparation ---
+    const dotVideo = document.getElementById("dotVideo");
+    dotVideo.src = "https://attachments.are.na/38428354/da56eae840d7fcabc39143864cfcccf2.mov"; // placeholder for video URL once uploaded
+    // --- Switch mode code ---
+    const dotWrapper = document.getElementById("dotWrapper");
+    const wrapper = document.getElementById("wrapper");
+    const fadeOverlay = document.getElementById("fadeOverlay");
+    const toggleModeButton = document.getElementById("toggleMode");
+
+    let inClockMode = true;
+
+toggleModeButton.addEventListener("click", () => {
+  fadeOverlay.style.opacity = "1";
+  fadeOverlay.style.zIndex = "6"; // bring to front
+
+  const duration = 3000;
+  const holdTime = 500;
+
+  setTimeout(() => {
+    inClockMode = !inClockMode;
+    wrapper.style.display = inClockMode ? "block" : "none";
+    dotWrapper.style.display = inClockMode ? "none" : "block";
+
+    setTimeout(() => {
+      fadeOverlay.style.opacity = "0";
+      // Wait for fade-out to complete before lowering zIndex
+      setTimeout(() => {
+        fadeOverlay.style.zIndex = "5";
+      }, duration);
+    }, holdTime);
+  }, duration);
+});
+
+    // Initially only show wrapper
+    wrapper.style.display = "block";
+    dotWrapper.style.display = "none";
+  </script>
+</body>
+</html>
